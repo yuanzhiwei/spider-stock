@@ -17,19 +17,6 @@ config = configparser.ConfigParser()
 config.read("../config.properties")
 firefox_path = config["general"]["firefox.path"]
 
-# 自定义header
-def init_phantomjs_driver(*args, **kwargs):
-    for key, value in util.headerutil.get_header().iteritems():
-        webdriver.DesiredCapabilities.PHANTOMJS['phantomjs.page.customHeaders.{}'.format(key)] = value
-    # 不加载图片
-    webdriver.DesiredCapabilities.PHANTOMJS['phantomjs.page.settings.loadImages'] = False
-
-    driver = webdriver.PhantomJS(*args, **kwargs)
-    driver.set_window_size(1400, 1000)
-    # 超时时间
-    driver.set_page_load_timeout(20)
-    return driver
-
 
 # firefox 使用代理，自定义header
 def get_firefox_driver(url, timeout=10):
@@ -71,7 +58,7 @@ def get_firefox_driver(url, timeout=10):
         try:
             driver.close()
         except Exception:
-            print( 'close driver error')
+            print('close driver error')
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -89,7 +76,7 @@ def get_firefox_driver_without_proxy_without_header(url):
         driver.set_script_timeout(10)
         driver.get(url)
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -123,17 +110,17 @@ def get_firefox_driver_with_image(url):
         driver.get(url)
         return driver
     except TimeoutException:
-        print( 'page load timeout')
+        print('page load timeout')
         if driver is None:
             return None
         driver.execute_script('window.stop ? window.stop() : document.execCommand("Stop");')
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         try:
             driver.close()
         except:
-            print( 'close driver error')
+            print('close driver error')
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -158,12 +145,12 @@ def get_firefox_driver_without_proxy(url):
                 driver.close()
                 driver.quit()
             except:
-                print( 'close error')
-        print( '页面加载过长')
+                print('close error')
+        print('页面加载过长')
         driver.execute_script('window.stop()')
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -171,7 +158,7 @@ def get_firefox_driver_without_proxy(url):
             driver.close()
             driver.quit()
         except:
-            print( 'close error')
+            print('close error')
         return None
 
 
@@ -192,27 +179,30 @@ def get_firefox_driver_without_proxy_with_img(url, timeout=30):
         driver.get(url)
         return driver
     except TimeoutException:
-        print( '页面加载过长')
+        print('页面加载过长')
         driver.execute_script('window.stop()')
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
         return None
 
 
-def get_chrome_driver_without_proxy(url, timeout=30):
+def get_chrome_driver_without_proxy(url, timeout=30, executable_path=None, headless=False):
     try:
         header = util.headerutil.get_header()
         options = webdriver.ChromeOptions()
+        if executable_path != None:
+            options.add_argument('executable_path=%s' % executable_path)
         options.add_argument('lang=zh_CN.UTF-8')
         options.add_argument(
             'user-agent=%s' % header['User-Agent'])
-        # driver = webdriver.Firefox(firefox_profile=profile, firefox_binary=binary)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option('useAutomationExtension', False)
+        if headless:
+            options.add_argument('headless')
         driver = webdriver.Chrome(chrome_options=options)
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
@@ -226,11 +216,11 @@ def get_chrome_driver_without_proxy(url, timeout=30):
         driver.get(url)
         return driver
     except TimeoutException:
-        print( '页面加载过长')
+        print('页面加载过长')
         driver.execute_script('window.stop()')
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -272,11 +262,11 @@ def get_driver_use_proxy(url, timeout=35):
         driver.get(url)
         return driver
     except TimeoutException:
-        print( '页面加载过长')
+        print('页面加载过长')
         driver.execute_script('window.stop()')
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
@@ -306,14 +296,14 @@ def get_driver_without_proxy(url):
         if "entity not found" in str(r):
             os.system("\"%s\"" % firefox_path)
             time.sleep(5)
-        print( r)
+        print(r)
         driver = None
 
     if driver is None:
         try:
             driver = webdriver.Firefox(firefox_options=firefox_options, firefox_profile=profile)
         except Exception as r:
-            print( r)
+            print(r)
             return None
 
     driver.set_page_load_timeout(10)
@@ -321,12 +311,12 @@ def get_driver_without_proxy(url):
         driver.get(url)
         return driver
     except Exception as r:
-        print( "error %s" % str(r))
+        print("error %s" % str(r))
 
         try:
             driver.close()
         except:
-            print( 'close error')
+            print('close error')
         return None
 
 
@@ -354,7 +344,7 @@ def get_url_response_with_proxy(url):
     try:
         r = requests.get(real_url, headers=headers, timeout=3, proxies=proxies)
     except Exception as t:
-        print( 'get url error url = %s ,error = %s' % (url, str(t)))
+        print('get url error url = %s ,error = %s' % (url, str(t)))
 
     index = 0
     while r is None or r.text is None or r.text == '':
@@ -370,7 +360,7 @@ def get_url_response_with_proxy(url):
         try:
             r = requests.get(real_url, headers=headers, timeout=5, proxies=proxies)
         except Exception as t:
-            print( 'get url error url = %s ,error = %s' % (url, str(t)))
+            print('get url error url = %s ,error = %s' % (url, str(t)))
         index += 1
 
     if r is None:
@@ -395,7 +385,7 @@ def get_url_content_text_post(url, formdata):
     try:
         r = requests.post(real_url, headers=headers, timeout=3, proxies=proxies, data=formdata, verify=False)
     except Exception as t:
-        print( 'get url error url = %s ,error = %s' % (url, str(t)))
+        print('get url error url = %s ,error = %s' % (url, str(t)))
 
     index = 0
     while r is None or r.text is None or r.text == '':
@@ -409,13 +399,12 @@ def get_url_content_text_post(url, formdata):
             "HTTPS": "https://%s" % proxy['ip']
         }
         if r is not None:
-            print( r.text)
+            print(r.text)
         try:
             r = requests.post(real_url, headers=headers, timeout=10, proxies=proxies, data=formdata, verify=False)
         except Exception as t:
-            print( 'get url error url = %s ,error = %s' % (url, str(t)))
+            print('get url error url = %s ,error = %s' % (url, str(t)))
         index += 1
-
 
     if r is None or r.text is None or r.text == '':
         return None
@@ -445,7 +434,7 @@ def get_url_content_text(url, cookies=None, header=None):
         else:
             r = requests.get(real_url, headers=headers, timeout=3, proxies=proxies)
     except Exception as t:
-        print( 'get url error url = %s ,error = %s' % (url, str(t)))
+        print('get url error url = %s ,error = %s' % (url, str(t)))
 
     index = 0
     while r is None or r.text is None or r.text == '':
@@ -461,16 +450,15 @@ def get_url_content_text(url, cookies=None, header=None):
             "HTTPS": "https://%s" % proxy['ip']
         }
         if r is not None:
-            print( r.text)
+            print(r.text)
         try:
             if cookies is not None:
                 r = requests.get(real_url, headers=headers, timeout=3, proxies=proxies, cookies=cookies)
             else:
                 r = requests.get(real_url, headers=headers, timeout=3, proxies=proxies)
         except Exception as t:
-            print ('get url error url = %s ,error = %s' % (url, str(t)))
+            print('get url error url = %s ,error = %s' % (url, str(t)))
         index += 1
-
 
     if r is None or r.text is None or r.text == '':
         return None
@@ -491,7 +479,7 @@ def get_url_content_text_without_proxy(url, cookies=None):
     try:
         r = requests.get(real_url, headers=headers, timeout=3)
     except Exception as t:
-        print( 'get url error url = %s ,error = %s' % (url, str(t)))
+        print('get url error url = %s ,error = %s' % (url, str(t)))
 
     index = 0
     while r is None or r.text is None or r.text == '':
@@ -502,7 +490,7 @@ def get_url_content_text_without_proxy(url, cookies=None):
         try:
             r = requests.get(real_url, headers=headers, timeout=5)
         except Exception as t:
-            print( 'get url error url = %s ,error = %s' % (url, str(t)))
+            print('get url error url = %s ,error = %s' % (url, str(t)))
         index += 1
 
     if r is None or r.text is None or r.text == '':
@@ -524,7 +512,7 @@ def get_url_content(url):
     try:
         r = requests.get(real_url, headers=headers, timeout=5)
     except Exception as t:
-        print( 'get url error url = %s ,error = %s' % (url, str(t)))
+        print('get url error url = %s ,error = %s' % (url, str(t)))
 
     if r is None or r.text is None or r.text == '':
         return None
@@ -535,7 +523,7 @@ def get_url_content(url):
     try:
         sel = etree.HTML(r.text)
     except Exception as t:
-        print( 'get html text error %s' % str(t))
+        print('get html text error %s' % str(t))
 
     return sel
 
@@ -560,11 +548,11 @@ def get_url_content_with_proxy(url, timeout=5, noheader=False, cookies=None):
     index = 0
     html = None
     try:
-        print( headers)
+        print(headers)
         if not noheader:
             if cookies is not None:
-                print( cookies)
-                print( proxies)
+                print(cookies)
+                print(proxies)
                 html = requests.get(real_url, headers=headers, proxies=proxies, timeout=timeout, verify=False,
                                     cookies=cookies)
             else:
@@ -577,7 +565,7 @@ def get_url_content_with_proxy(url, timeout=5, noheader=False, cookies=None):
 
 
     except Exception as r:
-        print ('get %s error ,reason = %s' % (real_url, str(r)))
+        print('get %s error ,reason = %s' % (real_url, str(r)))
 
     if html is not None and html.status_code == 404:
         return None
@@ -608,8 +596,7 @@ def get_url_content_with_proxy(url, timeout=5, noheader=False, cookies=None):
                 else:
                     html = requests.get(real_url, proxies=proxies, timeout=timeout, verify=False)
         except Exception as r:
-            print( 'get %s error ,reason = %s' % (real_url, str(r)))
-
+            print('get %s error ,reason = %s' % (real_url, str(r)))
 
         index += 1
         if index > 10:
@@ -635,14 +622,14 @@ def judge_url(url):
     real_url = url
     if 'http' not in url:
         real_url = 'http://%s' % url
-    print( real_url)
+    print(real_url)
     try:
         if 'https' in url:
             r = requests.get(real_url, timeout=5, verify=False, headers=headers, allow_redirects=True)
         else:
             r = requests.get(real_url, timeout=5, headers=headers, allow_redirects=True, verify=False)
     except Exception as r:
-        print( 'get url error url = %s, error = %s ' % (url, str(r)))
+        print('get url error url = %s, error = %s ' % (url, str(r)))
         return False
 
     if r.status_code >= 400:
@@ -658,7 +645,7 @@ def close_driver(driver):
     try:
         driver.close()
     except Exception as r:
-        print( str(r))
+        print(str(r))
 
 
 # 获取真实网址
@@ -682,7 +669,7 @@ def get_real_url(url, try_count=1):
 
 # 获取真实标题
 def get_url_title(url, try_count=1):
-    print( url)
+    print(url)
     if try_count > 5:
         return None
     headers = util.headerutil.get_header()
@@ -703,4 +690,3 @@ def get_url_title(url, try_count=1):
         return title
     except:
         return get_url_title(url, try_count + 1)
-

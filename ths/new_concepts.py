@@ -2,7 +2,7 @@
 # coding: utf-8
 
 """
-爬取同花顺特定资讯
+爬取同花顺新增概念
 """
 import time
 import datetime
@@ -12,6 +12,7 @@ import sys
 
 import util.driverutil
 import util.mysql
+from util.KafkaOperate import KafkaOperate
 
 
 class ths_spider:
@@ -48,6 +49,9 @@ class ths_spider:
 
         self.boundary = []
 
+        bs = 'localhost:9092'
+        kafka_op = KafkaOperate(bootstrap_servers=bs)
+
     def run(self):
         while True:
             print('---------执行抓取操作---------')
@@ -76,7 +80,8 @@ class ths_spider:
             return
 
         result = []
-        for index, li in sel.xpath("//div[@class='list-con']/ul/li"):
+        for index in range(len(sel.xpath("//div[@class='list-con']/ul/li"))):
+            li = sel.xpath("//div[@class='list-con']/ul/li")[index]
             aurl = li.xpath("./span/a/@href")[0]
             title = li.xpath("./span/a")[0].text
             time = li.xpath("./span/span")[0].text
@@ -142,6 +147,11 @@ class ths_spider:
                           news['title'], news['url'], news['description'], news['keyword'], news['time'])
                 util.mysql.cur.execute(sql)
                 util.mysql.conn.commit()
+
+                self.kafka_op.kfk_produce_one(topic_name='001_test',
+                                              data_dict={'title': news['title'], 'url': news['url'],
+                                                         'description': news['description'], 'time': news['time']})
+
             except Exception as r:
                 print('add monitor_news error %s' % str(r))
         return flag
@@ -150,8 +160,7 @@ class ths_spider:
 # main
 if __name__ == '__main__':
     '''
-    1.从库中获取需要监听的资讯类型
-    2.获取对应资讯类型新增的文章写入数据库
+    新增概念
     '''
     print('''
     ***************************************
