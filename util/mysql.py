@@ -17,7 +17,7 @@ conn = pymysql.connect(
     user=config[session_name]['local_username'],
     passwd=config[session_name]['local_password'],
     db=config[session_name]['local_db'],
-    charset='utf8')
+    charset='utf8', autocommit=True)
 
 conn.ping(True)
 

@@ -12,7 +12,7 @@ import sys
 
 import util.driverutil
 import util.mysql
-from util.KafkaOperate import KafkaOperate
+from util.kafka_producer import kafkaProducer
 
 
 class ths_spider:
@@ -50,13 +50,13 @@ class ths_spider:
         self.boundary = []
 
         bs = 'localhost:9092'
-        kafka_op = KafkaOperate(bootstrap_servers=bs)
+        self.kafka_op = kafkaProducer(bootstrap_servers=bs)
 
     def run(self):
         while True:
             print('---------执行抓取操作---------')
             self.parse_page()
-            time.sleep(60)
+            time.sleep(20)
 
     def parse_page(self, page=1):
         if page == 1:
@@ -80,6 +80,8 @@ class ths_spider:
             return
 
         result = []
+        # 边界值
+        boundary_flag = False
         for index in range(len(sel.xpath("//div[@class='list-con']/ul/li"))):
             li = sel.xpath("//div[@class='list-con']/ul/li")[index]
             aurl = li.xpath("./span/a/@href")[0]
@@ -90,8 +92,9 @@ class ths_spider:
             # 判断当前记录是否是边界值 ,如果是边界值则中断后续操作
             if len(self.boundary) > 0 and title == self.boundary[1] and aurl == self.boundary[2] and time == \
                     self.boundary[3]:
-                print(u'遇到边界值结束此次抓取, %s' % self.boundary)
-                return
+                self.logger.info(u'遇到边界值结束此次抓取: {0}'.format(self.boundary))
+                boundary_flag = True
+                break
             # 记录当前最新的一条数据
             if page == 1 and index == 0:
                 try:
@@ -99,10 +102,12 @@ class ths_spider:
                           "'%s', now())" % (title, aurl, time)
                     util.mysql.cur.execute(sql)
                     util.mysql.conn.commit()
+                    self.logger.info(u'新增最新爬取数据为边界值：{0}'.format(title))
                 except Exception as r:
                     print('add monitor_news error %s' % str(r))
 
-            for key in self.keywords:
+            # 遍历关键字匹配
+            for key in self.keywords:  # key 关键字 v0 排除关键字 v1删除关键字
                 if key in title:
                     if self.keywords[key][0] is None or len(self.keywords[key][0]) == 0:
                         hit = dict()
@@ -116,6 +121,7 @@ class ths_spider:
                         hit['keyword'] = key
                         hit['time'] = time
                         result.append(hit)
+                        self.logger.info(u'监控到新增概念1：{0}'.format(hit))
                     else:
                         for item in self.keywords[key].split(','):
                             if item in title:
@@ -128,8 +134,13 @@ class ths_spider:
                             hit['keyword'] = key
                             hit['time'] = time
                             result.append(hit)
-        flag = self.add_news(result)
-        if flag:
+                            self.logger.info(u'监控到新增概念2：{0}'.format(hit))
+        if len(result) > 0:
+            self.logger.info(u'执行消息推送：{0}'.format(result))
+            flag = self.add_news(result)
+            if flag and not boundary_flag:  # 如果正常插入且循环没有遇到边界值
+                self.parse_page(page + 1)
+        elif not boundary_flag:
             self.parse_page(page + 1)
 
     def add_news(self, arr):
@@ -148,10 +159,9 @@ class ths_spider:
                 util.mysql.cur.execute(sql)
                 util.mysql.conn.commit()
 
-                self.kafka_op.kfk_produce_one(topic_name='001_test',
+                self.kafka_op.kfk_produce_one(topic_name='new_concepts',
                                               data_dict={'title': news['title'], 'url': news['url'],
                                                          'description': news['description'], 'time': news['time']})
-
             except Exception as r:
                 print('add monitor_news error %s' % str(r))
         return flag

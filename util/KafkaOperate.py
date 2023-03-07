@@ -9,6 +9,8 @@ from kafka import KafkaProducer, KafkaConsumer
 import logging
 import logging.handlers
 
+import main
+
 
 class KafkaOperate(object):
 
@@ -39,7 +41,6 @@ class KafkaOperate(object):
             else:
                 self.__bootstrap_servers = [ip_port_string]
 
-        self.kafka_producer = None
         self.kafka_consumer = None
 
         pass
@@ -47,21 +48,26 @@ class KafkaOperate(object):
     def __del__(self):
         pass
 
-    def kfk_consume(self, topic_name=None, group_id='my_group'):
+    def kfk_consume(self, *topic_name, group_id='my_group'):
         if not self.kafka_consumer:
             self.kafka_consumer = KafkaConsumer(
-                topic_name, group_id=group_id,
+                *topic_name, group_id=group_id,
                 bootstrap_servers=self.__bootstrap_servers,
                 auto_offset_reset='earliest',
             )
-        count = 0
         for msg in self.kafka_consumer:
-            count += 1
-            # message value and key are raw bytes -- decode if necessary!
-            # e.g., for unicode: `message.value.decode('utf-8')`
-            info = f'[{count}] {msg.topic}:{msg.partition}:{msg.offset}: key={msg.key}, value={msg.value.decode("utf-8")}'
-            self.logger.info(info)
-            time.sleep(1)
+            if msg.topic == 'new_concepts':
+                self.logger.info('new_concepts: {0}'.format(msg))
+                value = json.loads(msg.value)
+                content = '''
+%s
+%s
+%s
+发布时间:%s''' % (value['title'], value['description'], value['url'], value['time'])
+                self.logger.info("同花顺监控推送")
+                room_id_list = main.room_id.split(",")
+                for i in range(len(room_id_list)):
+                    main.auto_send_message_room(content, room_id_list[i])
 
     def __kfk_produce(self, topic_name=None, data_dict=None, partition=None):
         """
@@ -92,22 +98,6 @@ class KafkaOperate(object):
             )
         else:
             self.kafka_producer.send(topic_name, data_dict)
-        pass
-
-    def kfk_produce_one(self, topic_name=None, data_dict=None, partition=None, partition_count=1):
-        partition = partition if partition else random.randint(0, partition_count - 1)
-        self.__kfk_produce(topic_name=topic_name, data_dict=data_dict, partition=partition)
-        self.kafka_producer.flush()
-
-    def kfk_produce_many(self, topic_name=None, data_dict_list=None, partition=None, partition_count=1, per_count=100):
-        count = 0
-        for data_dict in data_dict_list:
-            partition = partition if partition else count % partition_count
-            self.__kfk_produce(topic_name=topic_name, data_dict=data_dict, partition=partition)
-            if 0 == count % per_count:
-                self.kafka_producer.flush()
-            count += 1
-        self.kafka_producer.flush()
         pass
 
     @staticmethod
@@ -144,13 +134,9 @@ class KafkaOperate(object):
                 value_deserializer=lambda m: ujson.loads(m.decode('utf-8'))
             )
 
-    @staticmethod
-    def get_producer(bootstrap_servers: list):
-        return KafkaProducer(bootstrap_servers=bootstrap_servers, retries=5)
-
 
 if __name__ == '__main__':
     bs = 'localhost:9092'
     kafka_op = KafkaOperate(bootstrap_servers=bs)
-    kafka_op.kfk_consume(topic_name='001_test')
+    kafka_op.kfk_consume('new_concepts')
     pass
