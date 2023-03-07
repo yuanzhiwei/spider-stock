@@ -2,3 +2,7 @@
 *.pyc
 */*.log
 /ServerMain/*
+/video/*
+/img/*
+/images
+README.md
