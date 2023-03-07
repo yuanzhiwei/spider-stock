@@ -5,6 +5,7 @@ import json
 import logging
 import logging.handlers
 import time
+import datetime
 
 import pandas as pd
 import requests
@@ -278,7 +279,7 @@ class tfcf_stock_changes:
             if (zlkpld >= 10):
                 self.kafka_op.kfk_produce_one(topic_name='dfcf_stock_change',
                                               data_dict={'标题': item['event'] + '--' + item['stock_code'],
-                                                         '异动时间': item['change_time'],
+                                                         '异动时间':  item['change_time'].strftime('format="%H%M%S"'),
                                                          '主力净流入': (zljlr / 10000),
                                                          '成交量': (cjl / 10000)})
 

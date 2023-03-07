@@ -75,6 +75,7 @@ class KafkaOperate(object):
                 content = '''
 %s
 %s
+%s
 %s''' % (value['标题'], value['异动时间'], value['主力净流入'], value['成交量'])
                 self.logger.info("东方财富异动")
                 room_id_list = main.room_id.split(",")
@@ -150,6 +151,6 @@ class KafkaOperate(object):
 if __name__ == '__main__':
     bs = 'localhost:9092'
     kafka_op = KafkaOperate(bootstrap_servers=bs)
-    kafka_op.kfk_consume('new_concepts')
+    #kafka_op.kfk_consume('new_concepts')
     kafka_op.kfk_consume('dfcf_stock_change')
     pass
