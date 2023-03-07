@@ -1,20 +1,18 @@
 """
 #东方财富网实时交易盘口异动数据
 """
+import json
 import logging
 import logging.handlers
 import time
-from datetime import datetime
 
 import pandas as pd
 import requests
 
 import util.driverutil
 import util.mysql
-import json
-
 from data.money import intraday_money
-from util.KafkaOperate import KafkaOperate
+from util.kafka_producer import kafkaProducer
 from util.util import get_code_id, trans_num
 
 
@@ -48,7 +46,7 @@ class tfcf_stock_changes:
 
         self.boundary = []
         bs = 'localhost:9092'
-        kafka_op = KafkaOperate(bootstrap_servers=bs)
+        self.kafka_op = kafkaProducer(bootstrap_servers=bs)
 
     # 实时交易盘口异动数据
     def realtime_change(self, flag=None):
@@ -251,7 +249,7 @@ class tfcf_stock_changes:
             hit['content'] = content[index]
             result.append(hit);
             # 入库
-        self.add_news(result);
+        # self.add_news(result);
         # 判断是否需要推送至微信 主力净流入占资金总流入的10%以上
         self.is_need_push_message(result)
 
@@ -278,7 +276,7 @@ class tfcf_stock_changes:
             # 主力控盘力度
             zlkpld = (zljlr - cjl) % 100
             if (zlkpld >= 10):
-                self.kafka_op.kfk_produce_one(topic_name='001_test',
+                self.kafka_op.kfk_produce_one(topic_name='dfcf_stock_change',
                                               data_dict={'标题': item['event'] + '--' + item['stock_code'],
                                                          '异动时间': item['change_time'],
                                                          '主力净流入': (zljlr / 10000),
