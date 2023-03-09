@@ -9,12 +9,21 @@ import datetime
 
 import pandas as pd
 import requests
+import schedule
+from dateutil.rrule import rrule
 
 import util.driverutil
 import util.mysql
 from data.money import intraday_money
 from util.kafka_producer import kafkaProducer
 from util.util import get_code_id, trans_num
+
+# after_work_time = util.config.get("server", "after_work_time")
+# 默认输出市场全部类型的盘口异动情况（相当于短线精灵）
+changes_list = ['火箭发射', '快速反弹', '加速下跌', '高台跳水', '大笔买入',
+                '大笔卖出', '封涨停板', '封跌停板', '打开跌停板', '打开涨停板', '有大买盘',
+                '有大卖盘', '竞价上涨', '竞价下跌', '高开5日线', '低开5日线', '向上缺口',
+                '向下缺口', '60日新高', '60日新低', '60日大幅上涨', '60日大幅下跌']
 
 
 class tfcf_stock_changes:
@@ -49,37 +58,12 @@ class tfcf_stock_changes:
         bs = 'localhost:9092'
         self.kafka_op = kafkaProducer(bootstrap_servers=bs)
 
-    # 实时交易盘口异动数据
-    def realtime_change(self, flag=None):
+        stock_changes_type = []
+        for item in [0, 1, 4, 16]:
+            stock_changes_type.append(changes_list[item])
+        self.stock_changes_type = stock_changes_type
 
-        '''
-        flag：盘口异动类型，默认输出全部类型的异动情况
-        可选：['火箭发射', '快速反弹','加速下跌', '高台跳水', '大笔买入', '大笔卖出',
-            '封涨停板','封跌停板', '打开跌停板','打开涨停板','有大买盘','有大卖盘',
-            '竞价上涨', '竞价下跌','高开5日线','低开5日线',  '向上缺口','向下缺口',
-            '60日新高','60日新低','60日大幅上涨', '60日大幅下跌']
-        '''
-
-        # 默认输出市场全部类型的盘口异动情况（相当于短线精灵）
-        changes_list = ['火箭发射', '快速反弹', '加速下跌', '高台跳水', '大笔买入',
-                        '大笔卖出', '封涨停板', '封跌停板', '打开跌停板', '打开涨停板', '有大买盘',
-                        '有大卖盘', '竞价上涨', '竞价下跌', '高开5日线', '低开5日线', '向上缺口',
-                        '向下缺口', '60日新高', '60日新低', '60日大幅上涨', '60日大幅下跌']
-        n = range(1, len(changes_list) + 1)
-        change_dict = dict(zip(n, changes_list))
-        if flag is not None:
-            if isinstance(flag, int):
-                flag = change_dict[flag]
-            return self.stock_changes(symbol=flag)
-        else:
-            df = self.stock_changes(symbol=changes_list[0])
-        for s in changes_list[1:]:
-            temp = self.stock_changes(symbol=s)
-            df = pd.concat([df, temp])
-            df = df.sort_values('时间', ascending=False)
-        return df
-
-    def stock_changes(self, symbol):
+    def stock_changes(self, arr):
 
         """
         东方财富行盘口异动
@@ -119,8 +103,11 @@ class tfcf_stock_changes:
         }
 
         reversed_symbol_map = {v: k for k, v in symbol_map.items()}
+        temp = []
+        for item in arr:
+            temp.append(symbol_map[item])
         params = {
-            "type": symbol_map[symbol],
+            "type": ','.join(temp),
             "pageindex": "0",
             "pagesize": "5000",
             "ut": "7eea3edcaed734bea9cbfc24409ed989",
@@ -130,12 +117,18 @@ class tfcf_stock_changes:
 
         res = requests.get(url, params=params)
         data_json = res.json()
+        data = data_json["data"]
+        if data is None:
+            return
+
         df = pd.DataFrame(data_json["data"]["allstock"])
+        date = datetime.datetime.now().strftime('%Y-%m-%d')
         df["tm"] = pd.to_datetime(df["tm"], format="%H%M%S").dt.time
         df.columns = ["时间", "代码", "_", "名称", "板块", "相关信息", ]
         df = df[["时间", "代码", "名称", "板块", "相关信息", ]]
         df["板块"] = df["板块"].astype(str)
         df["板块"] = df["板块"].map(reversed_symbol_map)
+        df['时间'] = pd.to_datetime(date + " " + df.时间.astype(str))
         return df
 
     # 获取个股当天实时交易快照数据
@@ -219,7 +212,9 @@ class tfcf_stock_changes:
 
     # 解析
     def parse_result(self, arr):
-        sql = "select * from dfcf_stock_changes  order by gmt_created desc limit 1"
+        if arr is None:
+            return
+        sql = "select stock_code, change_time, event,stock_name,stock_content from dfcf_stock_changes  order by change_time desc limit 1"
         util.mysql.cur.execute(sql)
         results = util.mysql.cur.fetchall()
         if len(results) == 1:
@@ -236,36 +231,36 @@ class tfcf_stock_changes:
         result = []
         for index in range(0, len(times)):
             # 判断当前记录是否是边界值 ,如果是边界值则中断后续操作
-            if len(self.boundary) > 0 and codes[index] == self.boundary[1] and times[index] == self.boundary[
-                2] and event[index] == \
-                    self.boundary[3]:
-                print(u'遇到边界值结束此次抓取, %s' % self.boundary)
-                continue
-
+            if len(self.boundary) > 0 and codes[index] == self.boundary[0] and times[index] == self.boundary[
+                1] and event[index] == \
+                    self.boundary[2]:
+                self.logger.info(u'遇到边界值结束此次抓取: {0}'.format(self.boundary))
+                break;
+            # 大于十分钟不推送
             hit = dict()
             hit['change_time'] = times[index]
             hit['stock_code'] = codes[index]
             hit['stock_name'] = names[index]
             hit['event'] = event[index]
             hit['content'] = content[index]
-            result.append(hit);
+            result.append(hit)
             # 入库
-        # self.add_news(result);
+        self.add_news(result)
         # 判断是否需要推送至微信 主力净流入占资金总流入的10%以上
         self.is_need_push_message(result)
 
     def is_need_push_message(self, arr):
         if (arr is None):
             return
-        # time_str = time.strftime('%H:%M:%S', time.localtime(time.time()))
-        # t = pd.to_datetime(time_str, '%H:%M:%S',errors='ignore').dt.time;
+        localTime = datetime.datetime.now()
+
         for item in arr:
-            # change_time = item['change_time']
-            # diff = t - change_time;
-            # if (diff > 10):
-            #    continue
+            change_time = item['change_time']
+            diff = (localTime - change_time).total_seconds() / 60
+            if diff > 10:
+                continue
             df = intraday_money(item['stock_code'])
-            fast = df.iloc[0];
+            fast = df.iloc[0]
             print(fast)
             zljlr = fast['主力净流入']
             xdjlr = fast['小单净流入']
@@ -278,26 +273,34 @@ class tfcf_stock_changes:
             zlkpld = (zljlr - cjl) % 100
             if (zlkpld >= 10):
                 self.kafka_op.kfk_produce_one(topic_name='dfcf_stock_change',
-                                              data_dict={'标题': item['event'] + '--' + item['stock_code'],
-                                                         '异动时间':  item['change_time'].strftime('format="%H%M%S"'),
-                                                         '主力净流入': (zljlr / 10000),
-                                                         '成交量': (cjl / 10000)})
+                                              data_dict={
+                                                  '短线精灵提醒': item['event'] + '--' + item['stock_name'] + '--' +
+                                                                  item['stock_code'],
+                                                  '异动时间': item['change_time'].strftime('"%H:%M:%S"'),
+                                                  '小单净流入': (xdjlr / 10000),
+                                                  '中单净流入': (zdjlr / 10000),
+                                                  '大单净流入': (ddjlr / 10000),
+                                                  '超大单净流入': (cddjlr / 10000),
+                                                  '主力净流入': (zljlr / 10000)})
 
     def add_news(self, arr):
         flag = True
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        created = []
         for news in arr:
-            sql = "select * from dfcf_stock_changes where url='%s'" % (news['url'])
+            sql = "select stock_code, change_time, event,stock_name,stock_content from dfcf_stock_changes where stock_code='%s' and change_time ='%s' and event ='%s' and gmt_created=CURRENT_DATE()  " % (
+                news['stock_code'], news['change_time'], news['event'])
             util.mysql.cur.execute(sql)
             results = util.mysql.cur.fetchall()
             if len(results) > 0:
                 flag = False
                 break  # 遇到重复的不在继续执行后边的
+            item = self.generate_item(news, now)
+            created.append(item)
         try:
-            sql = "insert into dfcf_stock_changes(is_deleted, gmt_created, gmt_modified, stock_code, change_time, event,content,stock_name) values('%s', '%s', " \
-                  "'%s', '%s', '%s', now())" % (
-                      False, 'now()', 'now()', news['stock_code'], news['change_time'], news['event'], news['content'],
-                      news['stock_name'])
-            util.mysql.cur.execute(sql)
+            util.mysql.cur.executemany(
+                'insert into dfcf_stock_changes (is_deleted, gmt_created, gmt_modified, stock_code, change_time, event,stock_content,stock_name) values (%s,%s,%s,%s,%s,%s,%s,%s)',
+                created)
             util.mysql.conn.commit()
         except Exception as r:
             print('add monitor_news error %s' % str(r))
@@ -307,8 +310,17 @@ class tfcf_stock_changes:
     def run(self):
         while True:
             print('---------执行抓取操作---------')
-            self.realtime_change()
-            time.sleep(10)
+            stock_changes_type = self.stock_changes_type
+            df = self.stock_changes(stock_changes_type)
+            tfcf_stock_changes().parse_result(df)
+            time.sleep(30)
+
+    # 生成item
+    def generate_item(self, news, now):
+
+        item = (0, now, now, news['stock_code'], news['change_time'], news['event'], news['content'],
+                news['stock_name'])
+        return item
 
 
 # main
@@ -322,6 +334,5 @@ if __name__ == '__main__':
     ***************************************
     ''')
     # print(now)
-    df = tfcf_stock_changes().realtime_change(1)
-    print(df)
-    tfcf_stock_changes().parse_result(df)
+    tfcf_stock_changes().run()
+    # schedule.every().day.at(after_work_time).do(tfcf_stock_changes.run())
