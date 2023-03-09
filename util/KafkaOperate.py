@@ -157,6 +157,6 @@ class KafkaOperate(object):
 if __name__ == '__main__':
     bs = 'localhost:9092'
     kafka_op = KafkaOperate(bootstrap_servers=bs)
-    # kafka_op.kfk_consume('new_concepts')
-    kafka_op.kfk_consume('dfcf_stock_change')
+    kafka_op.kfk_consume('new_concepts', 'dfcf_stock_change')
+    # kafka_op.kfk_consume('dfcf_stock_change')
     pass
