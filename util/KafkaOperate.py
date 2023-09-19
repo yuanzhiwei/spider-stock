@@ -87,6 +87,18 @@ class KafkaOperate(object):
                 self.logger.info('new_concepts: {0}'.format(content))
                 for i in range(len(room_id_list)):
                     main.auto_send_message_room(content, room_id_list[i])
+            if msg.topic == 'sz_interact':
+                self.logger.info('sz_interact: {0}'.format(msg))
+                value = json.loads(msg.value)
+                content = '''
+%s            
+%s
+%s
+回复时间：%s
+    ''' % (value['title'], value['question'], value['answer'], value['answer_time'])
+                room_id_list = main.room_id.split(",")
+                for i in range(len(room_id_list)):
+                    main.auto_send_message_room(content, room_id_list[i])
 
     def __kfk_produce(self, topic_name=None, data_dict=None, partition=None):
         """
@@ -157,6 +169,5 @@ class KafkaOperate(object):
 if __name__ == '__main__':
     bs = 'localhost:9092'
     kafka_op = KafkaOperate(bootstrap_servers=bs)
-    kafka_op.kfk_consume('new_concepts', 'dfcf_stock_change')
-    # kafka_op.kfk_consume('dfcf_stock_change')
+    kafka_op.kfk_consume('new_concepts', 'dfcf_stock_change', 'sz_interact')
     pass

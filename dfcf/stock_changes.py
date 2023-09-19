@@ -59,7 +59,7 @@ class tfcf_stock_changes:
         self.kafka_op = kafkaProducer(bootstrap_servers=bs)
 
         stock_changes_type = []
-        for item in [0, 1, 4, 16]:
+        for item in [4]:
             stock_changes_type.append(changes_list[item])
         self.stock_changes_type = stock_changes_type
 
@@ -312,6 +312,7 @@ class tfcf_stock_changes:
             print('---------执行抓取操作---------')
             stock_changes_type = self.stock_changes_type
             df = self.stock_changes(stock_changes_type)
+            print(df)
             tfcf_stock_changes().parse_result(df)
             time.sleep(30)
 
