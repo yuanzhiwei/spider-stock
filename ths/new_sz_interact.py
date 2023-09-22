@@ -1,18 +1,18 @@
 """
 爬取上证互动e
 """
-import time
 import datetime
+import hashlib
 import logging
 import logging.handlers
-import hashlib
-import sys
+import time
 
 import requests
 from bs4 import BeautifulSoup
 
 import util.driverutil
 import util.mysql
+from data.trade import stock_info, web_data
 from util.kafka_producer import kafkaProducer
 
 
@@ -81,17 +81,34 @@ class sz_interact_spider:
                 flag = False
                 break  # 遇到重复的不在继续执行后边的
             try:
-                sql = "insert into investor_question_answer(question, answer, name,question_md5,answer_time) values('%s', '%s', '%s', '%s','%s')" % (
-                    news['question'], news['answer'], news['name'], question_md5, news['answer_time'])
+                sql = "insert into investor_question_answer(question, answer, name,question_md5,answer_time,stock_code) values('%s', '%s', '%s', '%s','%s','%s')" % (
+                    news['question'], news['answer'], news['name'], question_md5, news['answer_time'],
+                    news['stock_code'])
                 util.mysql.cur.execute(sql)
                 util.mysql.conn.commit()
 
-                self.kafka_op.kfk_produce_one(topic_name='sz_interact',
-                                              data_dict={'title': '上证互动E', 'question': news['question'],
-                                                         'answer': news['answer'], 'answer_time': news['answer_time']})
+                # 判断是否需要推送至微信 市值小于200亿&成交额大于3000万
+                self.is_need_push_message(news)
             except Exception as r:
                 print('add monitor_news error %s' % str(r))
         return flag
+
+    # 判断是否需要推送至微信 市值小于200亿&成交额大于3000万
+    def is_need_push_message(self, news):
+        stockInfo = stock_info(news['stock_code'])
+        flow_market_value = stockInfo['流通市值']
+        # 市值大于150亿不关注
+        if (flow_market_value > 15000000000):
+            return
+        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+        snapshot = web_data(news['stock_code'], yesterday.strftime("%Y%m%d"), yesterday.strftime("%Y%m%d"))
+        # 获取上一天成交额小于3000万不关注
+        amount = snapshot['turnover'][0]
+        if (amount < 30000000):
+            return
+        self.kafka_op.kfk_produce_one(topic_name='sz_interact',
+                                      data_dict={'title': '上证互动E', 'question': news['question'],
+                                                 'answer': news['answer'], 'answer_time': news['answer_time']})
 
     def run(self):
         while True:
@@ -127,14 +144,14 @@ class sz_interact_spider:
             temp['question'] = q
             temp['answer'] = a
             temp['answer_time'] = time
+            temp['stock_code'] = q[q.find('(') + 1:q.find(')')]
             items.append(temp)
-
         return items
 
     def flter_invalid_QA(self, arr):
         result = []
         for item in arr:
-            if '股东数' in item['question']:
+            if '股东数' in item['question'] or '股东人数' in item['question'] or '股东数量' in item['question']:
                 continue
             result.append(item)
         return result
