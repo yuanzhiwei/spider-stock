@@ -64,7 +64,6 @@ class sz_interact_spider:
 
         res = self.flter_invalid_QA(soup_res)
         if len(res) > 0:
-            self.logger.info(u'执行消息推送：{0}'.format(res))
             flag = self.add_news(res)
             if flag:  # 如果正常插入且循环没有遇到边界值
                 self.parse_page(page + 1)
@@ -97,15 +96,43 @@ class sz_interact_spider:
     def is_need_push_message(self, news):
         stockInfo = stock_info(news['stock_code'])
         flow_market_value = stockInfo['流通市值']
-        # 市值大于150亿不关注
-        if (flow_market_value > 15000000000):
-            return
-        yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+        industry = stockInfo['所处行业']
+        score = 0
+        # 市值大于50亿不关注
+        if (flow_market_value < 5000000000):
+            score += 2
+        # 市值大于100亿不关注
+        elif (flow_market_value < 10000000000):
+            score += 1
+        # 判断行业
+        if (
+                '半导体' in industry or '软件' in industry or '新能源' in industry or '电子元件' in industry or '医疗' in industry or '原料药' in industry):
+            score += 1
+
+        # 获取当前时间
+        now_time = datetime.datetime.now()
+        # 设置目标时间为下午 4 点
+        target_time = now_time.replace(hour=15, minute=0, second=0, microsecond=0)
+
+        # 当前时间大于下午3点 获取当天收盘数据
+        if (now_time >= target_time):
+            yesterday = now_time
+        else:
+            yesterday = now_time - datetime.timedelta(days=1)
         snapshot = web_data(news['stock_code'], yesterday.strftime("%Y%m%d"), yesterday.strftime("%Y%m%d"))
-        # 获取上一天成交额小于3000万不关注
+        # 成交额
         amount = snapshot['turnover'][0]
-        if (amount < 30000000):
+        # 收盘价
+        price = snapshot['close'][0]
+        if (price < 15):
+            score += 1
+        # 获取上一天成交额小于3000万不关注
+        if (amount > 30000000):
+            score += 2
+
+        if (score < 4):
             return
+        print(news)
         self.kafka_op.kfk_produce_one(topic_name='sz_interact',
                                       data_dict={'title': '上证互动E', 'question': news['question'],
                                                  'answer': news['answer'], 'answer_time': news['answer_time']})
@@ -151,7 +178,9 @@ class sz_interact_spider:
     def flter_invalid_QA(self, arr):
         result = []
         for item in arr:
-            if '股东数' in item['question'] or '股东人数' in item['question'] or '股东数量' in item['question']:
+            if '股东数' in item['question'] or '股东人数' in item['question'] or '股东数量' in item[
+                'question'] or '减持' in item['question'] or '连跌' in item['question'] or '股价下跌' in item[
+                'question'] or '回购' in item['question']:
                 continue
             result.append(item)
         return result

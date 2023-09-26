@@ -17,9 +17,10 @@ from jsonpath import jsonpath
 from datetime import datetime, timedelta
 
 from qstock.data.util import (request_header, session, market_num_dict,
-                  get_code_id, trans_num, trade_detail_dict, )
+                              get_code_id, trans_num, trade_detail_dict, )
 
 signal.signal(signal.SIGINT, multitasking.killall)
+
 
 # 获取某指定市场所有标的最新行情指标
 def market_realtime(market='沪深A'):
@@ -153,6 +154,7 @@ def stock_realtime(code_list):
     ignore_cols = ['名称', '代码', '市场', '时间']
     df = trans_num(df, ignore_cols)
     return df
+
 
 # 将接口market_indics和stock_indics封装在一起
 # 获取指定市场所有标的或单个或多个证券最新行情指标
@@ -340,7 +342,8 @@ def get_1min_data(code, n=5):
     df = trans_num(df, ignore_cols)
     return df
 
-#实时交易盘口异动数据
+
+# 实时交易盘口异动数据
 def realtime_change(flag=None):
     '''
     flag：盘口异动类型，默认输出全部类型的异动情况
@@ -349,27 +352,28 @@ def realtime_change(flag=None):
         '竞价上涨', '竞价下跌','高开5日线','低开5日线',  '向上缺口','向下缺口', 
         '60日新高','60日新低','60日大幅上涨', '60日大幅下跌']
     '''
-    #默认输出市场全部类型的盘口异动情况（相当于短线精灵）
-    changes_list=['火箭发射', '快速反弹','加速下跌', '高台跳水', '大笔买入', 
-        '大笔卖出', '封涨停板','封跌停板', '打开跌停板','打开涨停板','有大买盘',
-        '有大卖盘', '竞价上涨', '竞价下跌','高开5日线','低开5日线', '向上缺口',
-        '向下缺口', '60日新高','60日新低','60日大幅上涨', '60日大幅下跌']
-    n=range(1,len(changes_list)+1)
-    change_dict=dict(zip(n,changes_list))
+    # 默认输出市场全部类型的盘口异动情况（相当于短线精灵）
+    changes_list = ['火箭发射', '快速反弹', '加速下跌', '高台跳水', '大笔买入',
+                    '大笔卖出', '封涨停板', '封跌停板', '打开跌停板', '打开涨停板', '有大买盘',
+                    '有大卖盘', '竞价上涨', '竞价下跌', '高开5日线', '低开5日线', '向上缺口',
+                    '向下缺口', '60日新高', '60日新低', '60日大幅上涨', '60日大幅下跌']
+    n = range(1, len(changes_list) + 1)
+    change_dict = dict(zip(n, changes_list))
     if flag is not None:
-        if isinstance(flag,int):
-            flag=change_dict[flag]
+        if isinstance(flag, int):
+            flag = change_dict[flag]
         return stock_changes(symbol=flag)
     else:
-        
-        df=stock_changes(symbol=changes_list[0])
+
+        df = stock_changes(symbol=changes_list[0])
         for s in changes_list[1:]:
-            temp=stock_changes(symbol=s)
-            df=pd.concat([df,temp])
-            df=df.sort_values('时间',ascending=False)
+            temp = stock_changes(symbol=s)
+            df = pd.concat([df, temp])
+            df = df.sort_values('时间', ascending=False)
         return df
 
-#东方财富网实时交易盘口异动数据
+
+# 东方财富网实时交易盘口异动数据
 def stock_changes(symbol):
     """
     东方财富行盘口异动
@@ -418,8 +422,8 @@ def stock_changes(symbol):
     data_json = res.json()
     df = pd.DataFrame(data_json["data"]["allstock"])
     df["tm"] = pd.to_datetime(df["tm"], format="%H%M%S").dt.time
-    df.columns = ["时间","代码","_","名称","板块","相关信息",]
-    df= df[["时间","代码","名称","板块","相关信息",]]
+    df.columns = ["时间", "代码", "_", "名称", "板块", "相关信息", ]
+    df = df[["时间", "代码", "名称", "板块", "相关信息", ]]
     df["板块"] = df["板块"].astype(str)
     df["板块"] = df["板块"].map(reversed_symbol_map)
     return df
@@ -436,8 +440,8 @@ def web_data(code, start='19000101', end=None, freq='d', fqt=1):
     注意1分钟只能获取最近5个交易日一分钟数据
     fqt:复权类型，0：不复权，1：前复权；2：后复权，默认前复权
     """
-    if end in [None,'']:
-        end=latest_trade_date()
+    if end in [None, '']:
+        end = latest_trade_date()
     if freq == 1:
         return get_1min_data(code)
     start = ''.join(start.split('-'))
@@ -508,10 +512,11 @@ def web_data(code, start='19000101', end=None, freq='d', fqt=1):
     df = trans_num(df, ignore_cols)
     return df
 
+
 def latest_trade_date():
-    date=stock_realtime('上证指数')['时间'].values[0][:10]
+    date = stock_realtime('上证指数')['时间'].values[0][:10]
     return date
-    
+
 
 # 获取单只或多只证券（股票、基金、债券、期货)的收盘价格dataframe
 def get_price(code_list, start='19000101', end=None, freq='d', fqt=1):
@@ -520,15 +525,15 @@ def get_price(code_list, start='19000101', end=None, freq='d', fqt=1):
     '''
     if isinstance(code_list, str):
         code_list = [code_list]
-    
+
     if end is None:
-        end=latest_trade_date()
+        end = latest_trade_date()
 
     @multitasking.task
     def run(code):
         try:
             temp = web_data(code, start, end, freq, fqt)
-            temp[temp.name[0]]=temp.close
+            temp[temp.name[0]] = temp.close
             data_list.append(temp[temp.name[0]])
         except:
             pass
@@ -544,6 +549,7 @@ def get_price(code_list, start='19000101', end=None, freq='d', fqt=1):
     df = pd.concat(data_list, axis=1)
     return df
 
+
 # 获取单只或多只证券（股票、基金、债券、期货)的历史K线数据
 def get_data(code_list, start='19000101', end=None, freq='d', fqt=1):
     '''code_list输入股票list列表
@@ -553,7 +559,7 @@ def get_data(code_list, start='19000101', end=None, freq='d', fqt=1):
     if isinstance(code_list, str):
         code_list = [code_list]
     if end is None:
-        end=latest_trade_date()
+        end = latest_trade_date()
 
     data_list = []
 
@@ -568,6 +574,7 @@ def get_data(code_list, start='19000101', end=None, freq='d', fqt=1):
     # 转换为dataframe
     df = pd.concat(data_list, axis=0)
     return df
+
 
 ###股票数据接口
 # 获取单只个股最新的基本财务指标
@@ -607,6 +614,7 @@ def stock_info(code):
         index=stock_info_dict)
     return s
 
+
 # 获取单只或多只股票最新的基本财务指标
 def stock_basics(code_list):
     '''code_list:代码或简称，可以输入单只或多只个股的list
@@ -623,6 +631,7 @@ def stock_basics(code_list):
     cols = ['代码', '名称', '所处行业']
     df = trans_num(df, cols)
     return df
+
 
 # 获取沪深市场全部股票报告期信息
 def report_date():
@@ -872,19 +881,21 @@ def stock_billboard(start=None, end=None):
     s = s1 | s2 | s3
     df = df[-(s)]
     return df
-#获取沪深指数对应代码名称字典
+
+
+# 获取沪深指数对应代码名称字典
 def index_code_name():
-    df=realtime_data('沪深指数')
-    code_name_dict=dict((df[['代码','名称']].values))
+    df = realtime_data('沪深指数')
+    code_name_dict = dict((df[['代码', '名称']].values))
     return code_name_dict
 
-#获取指数历史交易数据
+
+# 获取指数历史交易数据
 def get_index_data(code_list, start='19000101', end=None, freq='d'):
-    
     if isinstance(code_list, str):
         code_list = [code_list]
     if end is None:
-        end=latest_trade_date()
+        end = latest_trade_date()
 
     data_list = []
 
@@ -895,31 +906,32 @@ def get_index_data(code_list, start='19000101', end=None, freq='d'):
 
     for code in tqdm(code_list):
         if code.isdigit():
-            code_name_dict=index_code_name()
-            code=code_name_dict[code]
+            code_name_dict = index_code_name()
+            code = code_name_dict[code]
         run(code)
     multitasking.wait_for_tasks()
     # 转换为dataframe
     df = pd.concat(data_list, axis=0)
     return df
 
+
 # 获取指数价格数据
 def get_index_price(code_list, start='19000101', end=None, freq='d'):
     '''code_list输入指数list列表
    
     '''
-    
+
     if isinstance(code_list, str):
         code_list = [code_list]
-    
+
     if end is None:
-        end=latest_trade_date()
+        end = latest_trade_date()
 
     @multitasking.task
     def run(code):
         try:
             temp = web_data(code, start, end, freq)
-            temp[temp.name[0]]=temp.close
+            temp[temp.name[0]] = temp.close
             data_list.append(temp[temp.name[0]])
         except:
             pass
@@ -927,8 +939,8 @@ def get_index_price(code_list, start='19000101', end=None, freq='d'):
     data_list = []
     for code in tqdm(code_list):
         if code.isdigit():
-            code_name_dict=index_code_name()
-            code=code_name_dict[code]
+            code_name_dict = index_code_name()
+            code = code_name_dict[code]
         try:
             run(code)
         except:
@@ -937,6 +949,7 @@ def get_index_price(code_list, start='19000101', end=None, freq='d'):
     # 转换为dataframe
     df = pd.concat(data_list, axis=1)
     return df
+
 
 # 获取股票所属板块
 def stock_sector(code):
@@ -1084,6 +1097,7 @@ def fund_data(code_list):
     df = pd.concat(data_list, axis=0)
     return df
 
+
 def fund_code(ft=None):
     """
     获取天天基金网公开的全部公墓基金名单
@@ -1129,6 +1143,7 @@ def fund_code(ft=None):
     results = re.findall('"(\d{6}),(.*?),', response.text)
     df = pd.DataFrame(results, columns=columns)
     return df
+
 
 def fund_position(code, n=1):
     '''code:基金代码，n:获取最近n期数据，n默认为1表示最近一期数据
@@ -1200,6 +1215,7 @@ def fund_dates(code):
         return []
     return json_response['Datas']
 
+
 def fund_perfmance(code):
     """
     获取基金阶段涨跌幅度
@@ -1246,6 +1262,7 @@ def fund_perfmance(code):
     df = trans_num(df, ignore_cols)
     return df
 
+
 def fund_base_info(code):
     """
     获取基金的一些基本信息
@@ -1281,7 +1298,7 @@ def fund_base_info(code):
         index=columns)[columns.values()]
 
     ss = ss.apply(lambda x: x.replace('\n', ' ').strip()
-                  if isinstance(x, str) else x)
+    if isinstance(x, str) else x)
     return ss
 
 
@@ -1387,6 +1404,7 @@ def bond_info_all():
 
     df = pd.concat(dfs, ignore_index=True)
     return df
+
 
 def bond_info(code_list=None):
     """
