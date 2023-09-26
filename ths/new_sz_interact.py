@@ -132,7 +132,6 @@ class sz_interact_spider:
 
         if (score < 4):
             return
-        print(news)
         self.kafka_op.kfk_produce_one(topic_name='sz_interact',
                                       data_dict={'title': '上证互动E', 'question': news['question'],
                                                  'answer': news['answer'], 'answer_time': news['answer_time']})
