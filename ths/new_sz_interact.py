@@ -105,32 +105,35 @@ class sz_interact_spider:
         elif (flow_market_value < 10000000000):
             score += 1
         # 判断行业
-        if (
-                '半导体' in industry or '软件' in industry or '新能源' in industry or '电子元件' in industry or '医疗' in industry or '原料药' in industry):
+        if ('半导体' in industry or '软件' in industry or '新能源' in industry or '电子元件' in industry or '医疗' in industry or '原料药' in industry):
             score += 1
-
         # 获取当前时间
         now_time = datetime.datetime.now()
         # 设置目标时间为下午 4 点
-        target_time = now_time.replace(hour=15, minute=0, second=0, microsecond=0)
+        #target_time = now_time.replace(hour=15, minute=0, second=0, microsecond=0)
 
         # 当前时间大于下午3点 获取当天收盘数据
-        if (now_time >= target_time):
-            yesterday = now_time
-        else:
-            yesterday = now_time - datetime.timedelta(days=1)
-        snapshot = web_data(news['stock_code'], yesterday.strftime("%Y%m%d"), yesterday.strftime("%Y%m%d"))
+        yesterday = now_time - datetime.timedelta(days=14)
+
+        snapshot_list = web_data(news['stock_code'], yesterday.strftime("%Y%m%d"), now_time.strftime("%Y%m%d"))
+        # 判断价格
+        for row in snapshot_list.itertuples():
+            # 价格
+            price_fluctuations = row[10]
+            if (price_fluctuations >= 9.5):
+                score += 2
+                break
+        snapshot_item = snapshot_list.tail(1)
         # 成交额
-        amount = snapshot['turnover'][0]
+        amount = snapshot_item['turnover'][0]
         # 收盘价
-        price = snapshot['close'][0]
+        price = snapshot_item['close'][0]
         if (price < 15):
             score += 1
         # 获取上一天成交额小于3000万不关注
         if (amount > 30000000):
             score += 2
-
-        if (score < 4):
+        if (score < 5):
             return
         self.kafka_op.kfk_produce_one(topic_name='sz_interact',
                                       data_dict={'title': '上证互动E', 'question': news['question'],

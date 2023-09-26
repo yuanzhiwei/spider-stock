@@ -466,16 +466,15 @@ def web_data(code, start='19000101', end=None, freq='d', fqt=1):
         'f57': '成交额',
         'f58': '振幅',
         'f59': '涨跌幅',
-        'f60': '涨跌额',
         'f61': '换手率'}
     fields = list(kline_field.keys())
     columns = list(kline_field.values())
-    cols1 = ['日期', '名称', '代码', '开盘', '最高', '最低', '收盘', '成交量', '成交额', '换手率']
-    cols2 = ['date', 'name', 'code', 'open', 'high', 'low', 'close', 'volume', 'turnover', 'turnover_rate']
+    cols1 = ['日期', '名称', '代码', '开盘', '最高', '最低', '收盘', '成交量', '成交额', '换手率','涨跌幅']
+    cols2 = ['date', 'name', 'code', 'open', 'high', 'low', 'close', 'volume', 'turnover', 'turnover_rate','price_fluctuations']
     fields2 = ",".join(fields)
     code_id = get_code_id(code)
     params = (
-        ('fields1', 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13'),
+        ('fields1', 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f59'),
         ('fields2', fields2),
         ('beg', start),
         ('end', end),
