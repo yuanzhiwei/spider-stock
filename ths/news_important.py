@@ -91,6 +91,7 @@ class ths_new_inportant:
                 self.kafka_op.kfk_produce_one(topic_name='new_concepts',
                                               data_dict={'title': news['title'], 'url': news['url'],
                                                          'description': news['digest'], 'time': ctime})
+                time.sleep(100)
             except Exception as r:
                 print('add monitor_news error %s' % str(r))
         return flag
