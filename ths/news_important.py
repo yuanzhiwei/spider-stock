@@ -64,7 +64,7 @@ class ths_new_inportant:
                 if flag:  # 如果正常插入且循环没有遇到边界值
                     self.parse_page(page + 1)
         except Exception as r:
-            print("monitor_important error:{}" % str(r))
+            print('parse_page monitor_important error %s' % str(r))
 
     def flter_invalid_QA(self, arr):
         result = []
