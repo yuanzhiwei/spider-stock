@@ -54,14 +54,17 @@ class ths_new_inportant:
             time.sleep(20)
 
     def parse_page(self, page=1):
-        url = 'http://news.10jqka.com.cn/tapp/news/push/stock/?page=1&tag=-21101&track=website&pagesize=5'
-        res = requests.get(url, headers=self.headers).json()
+        try:
+            url = 'http://news.10jqka.com.cn/tapp/news/push/stock/?page=1&tag=-21101&track=website&pagesize=5'
+            res = requests.get(url, headers=self.headers).json()
 
-        arrays = res['data']['list']
-        if len(arrays) > 0:
-            flag = self.add_news(arrays)
-            if flag:  # 如果正常插入且循环没有遇到边界值
-                self.parse_page(page + 1)
+            arrays = res['data']['list']
+            if len(arrays) > 0:
+                flag = self.add_news(arrays)
+                if flag:  # 如果正常插入且循环没有遇到边界值
+                    self.parse_page(page + 1)
+        except Exception as r:
+            print("monitor_important error:{}" % str(r))
 
     def flter_invalid_QA(self, arr):
         result = []
